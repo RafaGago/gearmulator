@@ -12,6 +12,15 @@ include(base.cmake)
 
 set(ASMJIT_STATIC TRUE)
 option(${PROJECT_NAME}_BUILD_JUCEPLUGIN "Build Juce plugin" on)
+option(${PROJECT_NAME}_ENABLE_LTO "Enable link time optimization" off)
+
+if ("${CMAKE_BUILD_TYPE}" MATCHES "Release")
+	if (${PROJECT_NAME}_ENABLE_LTO)
+		set (CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+		set (CMAKE_POLICY_DEFAULT_CMP0069 NEW)
+	endif()
+endif()
+
 add_subdirectory(source/dsp56300/source)
 add_subdirectory(source/synthLib)
 add_subdirectory(source/virusLib)
