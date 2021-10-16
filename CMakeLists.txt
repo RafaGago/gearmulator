@@ -21,6 +21,36 @@ if ("${CMAKE_BUILD_TYPE}" MATCHES "Release")
 	endif()
 endif()
 
+if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" AND
+	CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
+	# Workaround:
+	# "/LTCG" is of no relevance to lld-link, but it is not ignored. It triggers
+	# errors on Clang<=14.It is alredy fixed on mainstream:
+	# https://reviews.llvm.org/D108799?id=369019
+	string(
+		REPLACE
+		"/LTCG" ""
+		CMAKE_EXE_LINKER_FLAGS_RELEASE
+		${CMAKE_EXE_LINKER_FLAGS_RELEASE})
+	string(
+		REPLACE
+		"/LTCG" ""
+		CMAKE_MODULE_LINKER_FLAGS_RELEASE
+		${CMAKE_MODULE_LINKER_FLAGS_RELEASE})
+	string(
+		REPLACE
+		"/LTCG" ""
+		CMAKE_STATIC_LINKER_FLAGS_RELEASE
+		${CMAKE_STATIC_LINKER_FLAGS_RELEASE})
+	string(
+		REPLACE
+		"/LTCG" ""
+		CMAKE_SHARED_LINKER_FLAGS_RELEASE
+		${CMAKE_SHARED_LINKER_FLAGS_RELEASE})
+	# Workaround for WINDOWS API
+	add_definitions(-DWINAPI_FAMILY=100) # Desktopp App. See "winapifamily.h".
+endif()
+
 add_subdirectory(source/dsp56300/source)
 add_subdirectory(source/synthLib)
 add_subdirectory(source/virusLib)

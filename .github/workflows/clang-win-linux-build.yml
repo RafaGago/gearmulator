@@ -1,0 +1,83 @@
+name: CMake
+
+on:
+  push:
+    branches: [clang-build]
+  pull_request:
+    branches: [clang-build]
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
+  TARGETS: "jucePlugin_VST3 virusTestConsole"
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          submodules: "recursive"
+
+      - name: Install Deps
+        run: |
+          echo "deb http://apt.llvm.org/focal/ llvm-toolchain-focal main" | sudo tee -a /etc/apt/sources.list
+          echo "deb-src http://apt.llvm.org/focal/ llvm-toolchain-focal main" | sudo tee -a /etc/apt/sources.list
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo apt update
+          sudo apt install libasound2-dev libcurl4-openssl-dev libx11-dev libxinerama-dev libxext-dev libfreetype6-dev libwebkit2gtk-4.0-dev libglu1-mesa-dev libjack-jackd2-dev lv2-dev clang-14 clang-tools-14 lld-14
+
+      - name: Get latest CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Versions
+        run: |
+          cmake --version
+
+      # Build Windows first. It has more likelyhood to fail.
+      - name: Bootstrap Windows SDK
+        run: ./bootstrap-win-sdk.sh
+
+      - name: Configure Windows
+        # Not using ninja. I don't remember the reason but it wasn't really running parallel builds
+        run: cmake -B ${{github.workspace}}/build-windows -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -Dgearmulator_ENABLE_LTO=On -DCMAKE_TOOLCHAIN_FILE=clang-cl-xwin-x86_64.toolchain.cmake -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON
+
+      - name: Build Windows
+        run: cmake --build ${{github.workspace}}/build-windows --config ${{env.BUILD_TYPE}} --parallel --target ${{env.TARGETS}}
+
+      - name: Configure Linux
+        # Not using ninja. I don't remember the reason but it wasn't really running parallel builds
+        run: CC=/usr/bin/clang-14 CXX=/usr/bin/clang++-14 cmake -B ${{github.workspace}}/build-linux -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -Dgearmulator_ENABLE_LTO=On -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON
+
+      - name: Build Linux
+        run: cmake --build ${{github.workspace}}/build-linux --config ${{env.BUILD_TYPE}} --parallel --target ${{env.TARGETS}}
+
+      # virusTestConsole Linux
+      - uses: actions/upload-artifact@v2
+        with:
+          name: virusTestConsole-linux-latest
+          path: ${{github.workspace}}/build-linux/virusTestConsole
+
+      # virusTestConsole Windows
+      - uses: actions/upload-artifact@v2
+        with:
+          name: virusTestConsole-windows-latest
+          path: ${{github.workspace}}/build-windows/virusTestConsole.exe
+
+      # DSP56300 VST3 Linux
+      - uses: actions/upload-artifact@v2
+        with:
+          name: dsp56300-linux-vst3-latest
+          path: ${{github.workspace}}/build-linux/source/jucePlugin/jucePlugin_artefacts/Release/VST3/DSP56300Emu*.vst3/**
+
+      # DSP56300 VST3 Windows
+      - uses: actions/upload-artifact@v2
+        with:
+          name: dsp56300-windows-vst3-latest
+          path: ${{github.workspace}}/build-linux/source/jucePlugin/jucePlugin_artefacts/Release/VST3/DSP56300Emu*.vst3/**
